@@ -1,7 +1,10 @@
-import { View, Text, StyleSheet, FlatList, Pressable, Image, Dimensions } from "react-native";
+import { View, Text, StyleSheet, FlatList, Pressable, Image, Dimensions, Alert } from "react-native";
 import { Colors, FontSizes, Spacing, Shadows } from "../../constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
+import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 
 // Temporary data for testing
 const TEMP_IMAGES = [
@@ -18,11 +21,82 @@ const ITEM_WIDTH = (width - Spacing.lg * 2 - GRID_SPACING * (COLUMN_COUNT - 1)) 
 
 export default function Gallery() {
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [images, setImages] = useState(TEMP_IMAGES);
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Please grant permission to access your photos to upload images.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const selectedImageUri = result.assets[0].uri;
+
+        // Create a unique filename for the image
+        const filename = `${Date.now()}.jpg`;
+        const imagesDir = `${FileSystem.documentDirectory}images`;
+        const destination = `${imagesDir}/${filename}`;
+
+        try {
+          // Ensure the images directory exists
+          await FileSystem.makeDirectoryAsync(imagesDir, {
+            intermediates: true,
+          }).catch((e) => {
+            // Directory might already exist, that's okay
+            if (e.code !== "ERR_DIRECTORY_EXISTS") {
+              throw e;
+            }
+          });
+
+          // Copy the image to permanent storage
+          await FileSystem.copyAsync({
+            from: selectedImageUri,
+            to: destination,
+          });
+
+          console.log("Image saved successfully to:", destination);
+
+          const newImage = {
+            id: Date.now().toString(),
+            url: destination,
+            title: "New Upload",
+          };
+
+          setImages((prevImages) => [newImage, ...prevImages]);
+
+          // Only navigate after successful save
+          router.push({
+            pathname: "/image-detail",
+            params: {
+              imageUrl: destination,
+              title: "New Upload",
+            },
+          });
+        } catch (error) {
+          console.error("Error saving image:", error);
+          Alert.alert("Error", "Failed to save image. Please try again.");
+        }
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image. Please try again.");
+    }
+  };
 
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.title}>Gallery</Text>
-      <Pressable style={styles.uploadButton} onPress={() => {}}>
+      <Pressable style={styles.uploadButton} onPress={pickImage} android_ripple={{ color: Colors.gray[200] }}>
         <Ionicons name="add-circle" size={24} color={Colors.secondary} />
         <Text style={styles.uploadText}>Upload</Text>
       </Pressable>
@@ -46,8 +120,26 @@ export default function Gallery() {
   );
 
   const renderItem = ({ item }) => (
-    <Pressable style={styles.imageContainer} onPress={() => {}}>
-      <Image source={{ uri: item.url }} style={styles.image} />
+    <Pressable
+      style={styles.imageContainer}
+      onPress={() => {
+        if (item.url) {
+          console.log("Navigating to image detail with:", { imageUrl: item.url, title: item.title });
+          router.push({
+            pathname: "/image-detail",
+            params: {
+              imageUrl: item.url,
+              title: item.title,
+            },
+          });
+        }
+      }}
+    >
+      <Image
+        source={{ uri: item.url }}
+        style={styles.image}
+        onError={(error) => console.error("Error loading image in gallery:", error.nativeEvent.error)}
+      />
       <View style={styles.imageTitleContainer}>
         <Text style={styles.imageTitle}>{item.title}</Text>
       </View>
@@ -59,7 +151,7 @@ export default function Gallery() {
       {renderHeader()}
       {renderCategories()}
       <FlatList
-        data={TEMP_IMAGES}
+        data={images}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         numColumns={COLUMN_COUNT}
