@@ -31,7 +31,7 @@ A beautiful shared gallery application built with React Native and Expo, featuri
 2. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/yourusername/Camillery.git
+   git clone https://github.com/MariusChristensen/Camillery.git
    cd Camillery
    ```
 
@@ -87,12 +87,6 @@ Camillery/
 ├── contexts/            # React Context providers
 └── config/              # Application configuration
 ```
-
-## 🔧 Development
-
-- **Code Style**: The project uses ESLint and Prettier for code formatting
-- **Commit Messages**: Follow conventional commits format
-- **Branch Strategy**: Feature branches should branch off from `main`
 
 ## 📄 License
 
